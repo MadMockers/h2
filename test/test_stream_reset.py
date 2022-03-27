@@ -46,12 +46,15 @@ class TestStreamReset(object):
         f = frame_factory.build_headers_frame(
             headers=self.example_response_headers, stream_id=1
         )
-        rst_frame = frame_factory.build_rst_stream_frame(
-            1, h2.errors.ErrorCodes.STREAM_CLOSED
-        )
+
         events = c.receive_data(f.serialize())
+
+        # c.reset_stream above has already sent a RST_STREAM frame.
+        # RFC: "An endpoint MUST ignore frames that it receives on closed
+        #       streams after it has sent a RST_STREAM frame."
+        # Expect no data here.
         assert not events
-        assert c.data_to_send() == rst_frame.serialize()
+        assert c.data_to_send() == b""
 
         # This works because the header state should be intact from the headers
         # frame that was send on stream 1, so they should decode cleanly.

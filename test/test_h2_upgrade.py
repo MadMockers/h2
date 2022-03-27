@@ -231,13 +231,19 @@ class TestServerUpgrade(object):
         c = h2.connection.H2Connection(config=self.server_config)
         c.initiate_upgrade_connection()
         c.receive_data(frame_factory.preamble())
+
+        print(c.data_to_send())
         c.clear_outbound_data_buffer()
 
         f = frame_factory.build_headers_frame(
             stream_id=1,
             headers=self.example_request_headers,
         )
+
+        s = c.streams[1]
+        print(s.state_machine.stream_closed_by)
         c.receive_data(f.serialize())
+        print(s.state_machine.stream_closed_by)
 
         expected_frame = frame_factory.build_rst_stream_frame(
             stream_id=1,

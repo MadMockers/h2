@@ -1484,8 +1484,11 @@ class H2Connection:
         self.config.logger.trace("Received frame: %s", repr(frame))
         try:
             # I don't love using __class__ here, maybe reconsider it.
+            print("Received %r" % frame.__class__)
             frames, events = self._frame_dispatch_table[frame.__class__](frame)
         except StreamClosedError as e:
+            print("StreamClosedError...")
+
             # RFC 7540: Section 5.1 "Stream States" (Relevant portions):
             #   closed:
             #
@@ -1517,8 +1520,11 @@ class H2Connection:
             #    agrees was closed. (e.g, stream wasn't closed via RST_STREAM).
             #    Action: Protocal Error (re-raise)
 
+            print(self._stream_closed_by(e.stream_id))
+
             if self._stream_is_closed_by_reset(e.stream_id):
                 if self._stream_is_closed_by_peer_reset(e.stream_id):
+                    print("outcome 1")
                     # This outcome 1) from above
                     # Send a RST_STREAM frame and update close reason.
 
@@ -1532,10 +1538,12 @@ class H2Connection:
                         StreamClosedBy.SEND_RST_STREAM
                     )
                 else:
+                    print("outcome 2")
                     # This outcome 2) from above
                     # Ignore this frame
-                    pass
+                    events = []
             else:
+                print("outcome 3")
                 # This is outcome 3) from above
                 # Re-raise
                 raise
@@ -1560,7 +1568,7 @@ class H2Connection:
                 else:
                     # This outcome 2) from above
                     # Ignore this frame
-                    pass
+                    events = []
             elif self._stream_is_closed_by_end(e.stream_id):
                 # Closed by END_STREAM is a connection error.
                 raise StreamClosedError(e.stream_id)
@@ -2032,19 +2040,8 @@ class H2Connection:
         Returns ``True`` if the stream was closed by sending or receiving a
         RST_STREAM frame. Returns ``False`` otherwise.
         """
-        return self._stream_closed_by(stream_id) in (
-            StreamClosedBy.RECV_RST_STREAM
-        )
-
-    def _stream_set_closed_by(self, stream_id, closed_by):
-        """
-        Updates a streams closed_by value.
-        """
-
-        if stream_id in self.streams:
-            self.streams[stream_id].closed_by = closed_by
-        elif stream_id in self._closed_streams:
-            self._closed_streams[stream_id] = closed_by
+        return (self._stream_closed_by(stream_id) ==
+            StreamClosedBy.RECV_RST_STREAM)
 
     def _stream_is_closed_by_end(self, stream_id):
         """
@@ -2055,6 +2052,16 @@ class H2Connection:
         return self._stream_closed_by(stream_id) in (
             StreamClosedBy.RECV_END_STREAM, StreamClosedBy.SEND_END_STREAM
         )
+
+    def _stream_set_closed_by(self, stream_id, closed_by):
+        """
+        Updates a streams closed_by value.
+        """
+
+        if stream_id in self.streams:
+            self.streams[stream_id].override_closed_by(closed_by)
+        elif stream_id in self._closed_streams:
+            self._closed_streams[stream_id] = closed_by
 
 
 def _add_frame_priority(frame, weight=None, depends_on=None, exclusive=None):

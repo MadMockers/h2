@@ -818,6 +818,12 @@ class H2Stream:
         """
         return self.state_machine.stream_closed_by
 
+    def override_closed_by(self, closed_by):
+        """
+        Overrides the closed_by reason
+        """
+        self.state_machine.stream_closed_by = closed_by
+
     def upgrade(self, client_side):
         """
         Called by the connection to indicate that this stream is the initial
