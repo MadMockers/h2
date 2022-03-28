@@ -199,6 +199,8 @@ class TestStreamsClosedByEndStream(object):
                 self.example_request_headers, flags=['END_STREAM']),
             lambda self, ff: ff.build_headers_frame(
                 self.example_request_headers),
+            lambda self, ff: ff.build_data_frame(
+                data=b'some data')
         ]
     )
     @pytest.mark.parametrize("clear_streams", [True, False])
@@ -344,9 +346,13 @@ class TestStreamsClosedByRstStream(object):
                 self.example_request_headers, flags=['END_STREAM']),
         ]
     )
+    @pytest.mark.parametrize(
+        "clear_streams_before_send", [True, False]
+    )
     def test_resets_further_frames_after_recv_reset(self,
                                                     frame_factory,
-                                                    frame):
+                                                    frame,
+                                                    clear_streams_before_send):
         """
         A stream that is closed by receive RST_STREAM can receive further
         frames: it simply sends RST_STREAM for it, and additionally
@@ -372,6 +378,9 @@ class TestStreamsClosedByRstStream(object):
         )
         c.receive_data(rst_frame.serialize())
         c.clear_outbound_data_buffer()
+
+        if clear_streams_before_send:
+            c.open_outbound_streams
 
         f = frame(self, frame_factory)
         events = c.receive_data(f.serialize())
@@ -399,8 +408,12 @@ class TestStreamsClosedByRstStream(object):
         assert not events
         assert c.data_to_send() == b""
 
+    @pytest.mark.parametrize(
+        "clear_streams_before_send", [True, False]
+    )
     def test_resets_further_data_frames_after_recv_reset(self,
-                                                         frame_factory):
+                                                         frame_factory,
+                                                         clear_streams_before_send):
         """
         A stream that is closed by receive RST_STREAM can receive further
         DATA frames: it simply sends WINDOW_UPDATE for the connection flow
@@ -426,6 +439,9 @@ class TestStreamsClosedByRstStream(object):
         )
         c.receive_data(rst_frame.serialize())
         c.clear_outbound_data_buffer()
+
+        if clear_streams_before_send:
+            c.open_outbound_streams
 
         f = frame_factory.build_data_frame(
             data=b'some data'
@@ -485,10 +501,6 @@ class TestStreamsClosedByRstStream(object):
 
         # Send initial RST_STREAM
         c.reset_stream(1, h2.errors.ErrorCodes.INTERNAL_ERROR)
-
-        rst_frame = frame_factory.build_rst_stream_frame(
-            1, h2.errors.ErrorCodes.STREAM_CLOSED
-        )
         c.clear_outbound_data_buffer()
 
         f = frame(self, frame_factory)
