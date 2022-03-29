@@ -20,7 +20,7 @@ import h2.utilities
 
 import hyperframe.frame
 
-from hypothesis import given
+from hypothesis import given, settings, HealthCheck
 from hypothesis.strategies import binary, lists, tuples
 
 HEADERS_STRATEGY = lists(tuples(binary(min_size=1), binary()))
@@ -508,6 +508,7 @@ class TestFilter(object):
     @pytest.mark.parametrize('validation_function', validation_functions)
     @pytest.mark.parametrize('hdr_validation_flags', hdr_validation_combos)
     @given(headers=HEADERS_STRATEGY)
+    @settings(suppress_health_check=[HealthCheck.function_scoped_fixture])
     def test_range_of_acceptable_outputs(self,
                                          headers,
                                          validation_function,
